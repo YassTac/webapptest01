@@ -1,40 +1,50 @@
-import altair as alt
-import numpy as np
-import pandas as pd
 import streamlit as st
+from Bio import Entrez
 
-"""
-# Welcome to Streamlit!
+# Configuration de l'email pour NCBI Entrez
+Entrez.email = "votre_email@example.com"
 
-Edit `/streamlit_app.py` to customize this app to your heart's desire :heart:.
-If you have any questions, checkout our [documentation](https://docs.streamlit.io) and [community
-forums](https://discuss.streamlit.io).
+# Fonction pour effectuer la requête NCBI
+def search_ncbi(terms):
+    handle = Entrez.esearch(db="pubmed", term=terms, retmax=10)
+    record = Entrez.read(handle)
+    handle.close()
+    return record["IdList"]
 
-In the meantime, below is an example of what you can do with just a few lines of code:
-"""
+# Fonction pour récupérer les résumés des articles
+def fetch_abstracts(id_list):
+    ids = ",".join(id_list)
+    handle = Entrez.efetch(db="pubmed", id=ids, rettype="abstract", retmode="text")
+    abstracts = handle.read()
+    handle.close()
+    return abstracts
 
-num_points = st.slider("Number of points in spiral", 1, 10000, 1100)
-num_turns = st.slider("Number of turns in spiral", 1, 300, 31)
+# Interface utilisateur Streamlit
+st.title("Recherche d'articles scientifiques")
+st.write("Entrez votre adresse email et les termes MeSH pour rechercher des articles scientifiques sur PubMed.")
 
-indices = np.linspace(0, 1, num_points)
-theta = 2 * np.pi * num_turns * indices
-radius = indices
+# Champ pour entrer l'adresse email
+email = st.text_input("Adresse email")
 
-x = radius * np.cos(theta)
-y = radius * np.sin(theta)
+# Champ pour entrer les termes MeSH
+mesh_terms = st.text_input("Termes MeSH")
 
-df = pd.DataFrame({
-    "x": x,
-    "y": y,
-    "idx": indices,
-    "rand": np.random.randn(num_points),
-})
+if st.button("Rechercher"):
+    if email and mesh_terms:
+        # Mise à jour de l'email pour NCBI Entrez
+        Entrez.email = email
 
-st.altair_chart(alt.Chart(df, height=700, width=700)
-    .mark_point(filled=True)
-    .encode(
-        x=alt.X("x", axis=None),
-        y=alt.Y("y", axis=None),
-        color=alt.Color("idx", legend=None, scale=alt.Scale()),
-        size=alt.Size("rand", legend=None, scale=alt.Scale(range=[1, 150])),
-    ))
+        # Recherche des articles
+        id_list = search_ncbi(mesh_terms)
+        if id_list:
+            st.write(f"{len(id_list)} articles trouvés.")
+            abstracts = fetch_abstracts(id_list)
+            st.text_area("Résumés des articles", abstracts, height=300)
+        else:
+            st.write("Aucun article trouvé pour ces termes.")
+    else:
+        st.write("Veuillez entrer une adresse email et des termes MeSH.")
+
+if st.button("Réinitialiser"):
+    email = ""
+    mesh_terms = ""
