@@ -50,7 +50,7 @@ email = st.text_input("Adresse email")
 mesh_terms = st.text_input("Termes MeSH")
 
 # Sélection du nombre d'articles à récupérer
-num_articles = st.number_input("Nombre d'articles à récupérer", min_value=1, max_value=100, value=10)
+num_articles = st.number_input("Nombre d'articles à récupérer", min_value=1, max_value=1000, value=10)
 
 if st.button("Rechercher"):
     if email and mesh_terms:
