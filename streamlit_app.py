@@ -3,6 +3,7 @@ from Bio import Entrez
 import pandas as pd
 from io import BytesIO
 
+
 # Configuration de l'email pour NCBI Entrez
 Entrez.email = "votre_email@example.com"
 
