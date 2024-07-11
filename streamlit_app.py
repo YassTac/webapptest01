@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 from Bio import Entrez
+import io
 
 def pubmed_search(email, query, retmax):
     Entrez.email = email
@@ -46,9 +47,14 @@ retmax = st.number_input("Enter the maximum number of articles to retrieve:", mi
 if st.button("Search"):
     df = pubmed_search(email, query, retmax)
     st.write(df)
-    st.download_button(
-        label="Download as Excel",
-        data=df.to_excel(index=False),
-        file_name="pubmed_search_results.xlsx",
-        mime="application/vnd.ms-excel",
-    )
+    if not df.empty:
+        excel_file = io.BytesIO()
+        df.to_excel(excel_file, index=False)
+        st.download_button(
+            label="Download as Excel",
+            data=excel_file.getvalue(),
+            file_name="pubmed_search_results.xlsx",
+            mime="application/vnd.ms-excel",
+        )
+    else:
+        st.write("No results found.")
