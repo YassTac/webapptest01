@@ -28,24 +28,29 @@ def fetch_abstracts(id_list):
     for record in records['PubmedArticle']:
         article = record['MedlineCitation']['Article']
         title = article['ArticleTitle']
-        abstract = article['Abstract']['AbstractText'][0] if 'Abstract' in article else 'No abstract available'
-        
+        abstract = article.get('Abstract', {}).get('AbstractText', ['No abstract available'])[0]
+
+        # Récupération de l'année de publication
+        year = 'Not available'
         if 'ArticleDate' in article:
-            year = article['ArticleDate'][0]['Year']
-        else:
-            year = article['Journal']['JournalIssue']['PubDate']['Year'] if 'Year' in article['Journal']['JournalIssue']['PubDate'] else 'Not available'
+            year = article['ArticleDate'][0].get('Year', 'Not available')
+        elif 'JournalIssue' in article['Journal'] and 'PubDate' in article['Journal']['JournalIssue']:
+            pub_date = article['Journal']['JournalIssue']['PubDate']
+            if 'Year' in pub_date:
+                year = pub_date['Year']
         
-        journal = article['Journal']['Title'] if 'Title' in article['Journal'] else 'No journal title available'
+        journal = article['Journal'].get('Title', 'No journal title available')
         
-        if 'ELocationID' in article:
-            doi = next((eid for eid in article['ELocationID'] if eid.attributes['EIdType'] == 'doi'), 'No DOI available')
-            doi = doi if isinstance(doi, str) else 'No DOI available'
-        else:
-            doi = 'No DOI available'
+        doi = 'No DOI available'
+        for elocation in article.get('ELocationID', []):
+            if elocation.attributes['EIdType'] == 'doi':
+                doi = elocation
+                break
         
         abstracts.append({'Title': title, 'Abstract': abstract, 'Year': year, 'Journal': journal, 'DOI': doi})
         
     return abstracts
+
 
 # Fonction pour convertir les données en Excel et générer un lien de téléchargement
 def convert_to_excel(data):
