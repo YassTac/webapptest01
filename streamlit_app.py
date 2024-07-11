@@ -12,13 +12,27 @@ def pubmed_search(email, query, retmax):
     for id in ids:
         handle = Entrez.efetch(db="pubmed", id=id, retmode="xml")
         record = Entrez.read(handle)
-        article = {
-            "title": record["MedlineCitation"]["Article"]["ArticleTitle"],
-            "abstract": record["MedlineCitation"]["Article"]["Abstract"]["AbstractText"],
-            "year": record["MedlineCitation"]["Article"]["Journal"]["JournalIssue"]["PubDate"]["Year"],
-            "journal": record["MedlineCitation"]["Article"]["Journal"]["Title"],
-            "doi": record["PubmedData"]["ArticleIdList"][0]
-        }
+        article = {}
+        try:
+            article["title"] = record["MedlineCitation"]["Article"]["ArticleTitle"]
+        except KeyError:
+            article["title"] = "N/A"
+        try:
+            article["abstract"] = "\n".join(record["MedlineCitation"]["Article"]["Abstract"]["AbstractText"])
+        except KeyError:
+            article["abstract"] = "N/A"
+        try:
+            article["year"] = record["MedlineCitation"]["Article"]["Journal"]["JournalIssue"]["PubDate"]["Year"]
+        except KeyError:
+            article["year"] = "N/A"
+        try:
+            article["journal"] = record["MedlineCitation"]["Article"]["Journal"]["Title"]
+        except KeyError:
+            article["journal"] = "N/A"
+        try:
+            article["doi"] = record["PubmedData"]["ArticleIdList"][0]
+        except (KeyError, IndexError):
+            article["doi"] = "N/A"
         articles.append(article)
 
     return pd.DataFrame(articles)
