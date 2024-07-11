@@ -27,25 +27,27 @@ def fetch_abstracts(id_list):
     abstracts = []
     for record in records['PubmedArticle']:
         article = record['MedlineCitation']['Article']
-        title = article['ArticleTitle']
+        title = article.get('ArticleTitle', 'No title available')
         abstract = article.get('Abstract', {}).get('AbstractText', ['No abstract available'])[0]
 
-        # Récupération de l'année de publication
+        # Tentative améliorée pour récupérer l'année de publication
         year = 'Not available'
-        if 'ArticleDate' in article:
-            year = article['ArticleDate'][0].get('Year', 'Not available')
+        if 'ArticleDate' in article and article['ArticleDate']:
+            article_date = article['ArticleDate'][0]
+            year = article_date.get('Year', 'Not available')
         elif 'JournalIssue' in article['Journal'] and 'PubDate' in article['Journal']['JournalIssue']:
             pub_date = article['Journal']['JournalIssue']['PubDate']
-            if 'Year' in pub_date:
-                year = pub_date['Year']
-        
+            year = pub_date.get('Year', 'Not available')
+
         journal = article['Journal'].get('Title', 'No journal title available')
-        
+
+        # Récupération du DOI
         doi = 'No DOI available'
-        for elocation in article.get('ELocationID', []):
-            if elocation.attributes['EIdType'] == 'doi':
-                doi = elocation
-                break
+        if 'ELocationID' in article:
+            for elocation in article['ELocationID']:
+                if elocation.attributes.get('EIdType') == 'doi':
+                    doi = elocation.get('#text', 'No DOI available')
+                    break
         
         abstracts.append({'Title': title, 'Abstract': abstract, 'Year': year, 'Journal': journal, 'DOI': doi})
         
