@@ -3,16 +3,19 @@ from Bio import Entrez
 import pandas as pd
 from io import BytesIO
 
-
 # Configuration de l'email pour NCBI Entrez
 Entrez.email = "votre_email@example.com"
 
 # Fonction pour effectuer la requête NCBI
 def search_ncbi(terms, retmax):
-    handle = Entrez.esearch(db="pubmed", term=terms, retmax=retmax)
-    record = Entrez.read(handle)
-    handle.close()
-    return record["IdList"]
+    try:
+        handle = Entrez.esearch(db="pubmed", term=terms, retmax=retmax)
+        record = Entrez.read(handle)
+        handle.close()
+        return record["IdList"]
+    except Exception as e:
+        st.error(f"Erreur lors de la recherche dans PubMed: {e}")
+        return []
 
 # Fonction pour récupérer les résumés des articles
 def fetch_abstracts(id_list):
@@ -26,7 +29,21 @@ def fetch_abstracts(id_list):
         article = record['MedlineCitation']['Article']
         title = article['ArticleTitle']
         abstract = article['Abstract']['AbstractText'][0] if 'Abstract' in article else 'No abstract available'
-        abstracts.append({'Title': title, 'Abstract': abstract})
+        
+        if 'ArticleDate' in article:
+            year = article['ArticleDate'][0]['Year']
+        else:
+            year = article['Journal']['JournalIssue']['PubDate']['Year'] if 'Year' in article['Journal']['JournalIssue']['PubDate'] else 'Not available'
+        
+        journal = article['Journal']['Title'] if 'Title' in article['Journal'] else 'No journal title available'
+        
+        if 'ELocationID' in article:
+            doi = next((eid for eid in article['ELocationID'] if eid.attributes['EIdType'] == 'doi'), 'No DOI available')
+            doi = doi if isinstance(doi, str) else 'No DOI available'
+        else:
+            doi = 'No DOI available'
+        
+        abstracts.append({'Title': title, 'Abstract': abstract, 'Year': year, 'Journal': journal, 'DOI': doi})
         
     return abstracts
 
@@ -73,6 +90,4 @@ if st.button("Rechercher"):
         st.write("Veuillez entrer une adresse email et des termes MeSH.")
 
 if st.button("Réinitialiser"):
-    email = ""
-    mesh_terms = ""
-    num_articles = 10
+    st.experimental_rerun()
