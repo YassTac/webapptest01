@@ -1,60 +1,78 @@
 import streamlit as st
-import pandas as pd
 from Bio import Entrez
-import io
+import pandas as pd
+from io import BytesIO
 
-def pubmed_search(email, query, retmax):
-    Entrez.email = email
-    handle = Entrez.esearch(db="pubmed", term=query, retmax=retmax)
+
+# Configuration de l'email pour NCBI Entrez
+Entrez.email = "votre_email@example.com"
+
+# Fonction pour effectuer la requête NCBI
+def search_ncbi(terms, retmax):
+    handle = Entrez.esearch(db="pubmed", term=terms, retmax=retmax)
     record = Entrez.read(handle)
-    ids = record["IdList"]
+    handle.close()
+    return record["IdList"]
 
-    articles = []
-    for id in ids:
-        handle = Entrez.efetch(db="pubmed", id=id, retmode="xml")
-        record = Entrez.read(handle)
-        article = {}
-        try:
-            article["title"] = record["MedlineCitation"]["Article"]["ArticleTitle"]
-        except KeyError:
-            article["title"] = "N/A"
-        try:
-            article["abstract"] = "\n".join(record["MedlineCitation"]["Article"]["Abstract"]["AbstractText"])
-        except KeyError:
-            article["abstract"] = "N/A"
-        try:
-            article["year"] = record["MedlineCitation"]["Article"]["Journal"]["JournalIssue"]["PubDate"]["Year"]
-        except KeyError:
-            article["year"] = "N/A"
-        try:
-            article["journal"] = record["MedlineCitation"]["Article"]["Journal"]["Title"]
-        except KeyError:
-            article["journal"] = "N/A"
-        try:
-            article["doi"] = record["PubmedData"]["ArticleIdList"][0]
-        except (KeyError, IndexError):
-            article["doi"] = "N/A"
-        articles.append(article)
+# Fonction pour récupérer les résumés des articles
+def fetch_abstracts(id_list):
+    ids = ",".join(id_list)
+    handle = Entrez.efetch(db="pubmed", id=ids, rettype="abstract", retmode="xml")
+    records = Entrez.read(handle)
+    handle.close()
+    
+    abstracts = []
+    for record in records['PubmedArticle']:
+        article = record['MedlineCitation']['Article']
+        title = article['ArticleTitle']
+        abstract = article['Abstract']['AbstractText'][0] if 'Abstract' in article else 'No abstract available'
+        abstracts.append({'Title': title, 'Abstract': abstract})
+        
+    return abstracts
 
-    return pd.DataFrame(articles)
+# Fonction pour convertir les données en Excel et générer un lien de téléchargement
+def convert_to_excel(data):
+    df = pd.DataFrame(data)
+    output = BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        df.to_excel(writer, index=False, sheet_name='Articles')
+    processed_data = output.getvalue()
+    return processed_data
 
-st.title("PubMed Search")
+# Interface utilisateur Streamlit
+st.title("Recherche d'articles scientifiques")
+st.write("Entrez votre adresse email et les termes MeSH pour rechercher des articles scientifiques sur PubMed.")
 
-email = st.text_input("Enter your email address:")
-query = st.text_input("Enter your search query:")
-retmax = st.number_input("Enter the maximum number of articles to retrieve:", min_value=1, step=1)
+# Champ pour entrer l'adresse email
+email = st.text_input("Adresse email")
 
-if st.button("Search"):
-    df = pubmed_search(email, query, retmax)
-    st.write(df)
-    if not df.empty:
-        excel_file = io.BytesIO()
-        df.to_excel(excel_file, index=False)
-        st.download_button(
-            label="Download as Excel",
-            data=excel_file.getvalue(),
-            file_name="pubmed_search_results.xlsx",
-            mime="application/vnd.ms-excel",
-        )
+# Champ pour entrer les termes MeSH
+mesh_terms = st.text_input("Termes MeSH")
+
+# Sélection du nombre d'articles à récupérer
+num_articles = st.number_input("Nombre d'articles à récupérer", min_value=1, max_value=1000, value=10)
+
+if st.button("Rechercher"):
+    if email and mesh_terms:
+        # Mise à jour de l'email pour NCBI Entrez
+        Entrez.email = email
+
+        # Recherche des articles
+        id_list = search_ncbi(mesh_terms, num_articles)
+        if id_list:
+            st.write(f"{len(id_list)} articles trouvés.")
+            abstracts = fetch_abstracts(id_list)
+            st.dataframe(abstracts)
+
+            # Conversion des données en Excel
+            excel_data = convert_to_excel(abstracts)
+            st.download_button(label="Télécharger les résultats en Excel", data=excel_data, file_name='articles.xlsx', mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+        else:
+            st.write("Aucun article trouvé pour ces termes.")
     else:
-        st.write("No results found.")
+        st.write("Veuillez entrer une adresse email et des termes MeSH.")
+
+if st.button("Réinitialiser"):
+    email = ""
+    mesh_terms = ""
+    num_articles = 10
